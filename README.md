@@ -30,7 +30,7 @@ The compiled binary will be available at `target/release/snout`.
 ## Roadmap
 
 - [x] Plain-text search across a folder
-- [ ] Recursive search into subfolders
+- [x] Recursive search into subfolders
 - [ ] Support for common document formats (PDF, DOCX, XLSX, ...)
 - [ ] Full-text index for fast search over large file sets
 - [ ] Semantic search (find by topic, not just exact words)
