@@ -1,0 +1,11 @@
+[package]
+name = "snout"
+version = "0.1.0"
+edition = "2021"
+description = "Search words, topics and content across all your files, locally."
+license = "MIT"
+repository = "https://github.com/Blazi2002/snout"
+readme = "README.md"
+authors = ["Blazi2002"]
+
+[dependencies]
