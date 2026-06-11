@@ -9,3 +9,4 @@ readme = "README.md"
 authors = ["Blazi2002"]
 
 [dependencies]
+walkdir = "2.5.0"
