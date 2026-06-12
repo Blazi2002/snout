@@ -31,7 +31,7 @@ The compiled binary will be available at `target/release/snout`.
 
 - [x] Plain-text search across a folder
 - [x] Recursive search into subfolders
-- [~] Document formats: DOCX (done), PDF and XLSX (in progress)
+- [x] Document formats: DOCX, PDF, XLSX, ODS
 - [ ] Full-text index for fast search over large file sets
 - [ ] Semantic search (find by topic, not just exact words)
 - [ ] Image content search
