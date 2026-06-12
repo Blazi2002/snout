@@ -12,6 +12,7 @@ pub fn extract_text(path: &Path) -> Option<String> {
 
     match extension.as_str() {
         "docx" => extract_docx(path),
+        "pdf" => extract_pdf(path),
         // I formati testuali noti vengono letti direttamente
         "txt" | "md" | "csv" | "json" | "xml" | "html" | "log" => {
             fs::read_to_string(path).ok()
@@ -20,6 +21,11 @@ pub fn extract_text(path: &Path) -> Option<String> {
         // così non perdiamo file di codice o formati testuali non elencati
         _ => fs::read_to_string(path).ok(),
     }
+}
+
+fn extract_pdf(path: &Path) -> Option<String> {
+    // pdf-extract gestisce font, encoding e compressione interni al PDF
+    pdf_extract::extract_text(path).ok()
 }
 
 fn extract_docx(path: &Path) -> Option<String> {
