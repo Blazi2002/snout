@@ -13,6 +13,7 @@ pub fn extract_text(path: &Path) -> Option<String> {
     match extension.as_str() {
         "docx" => extract_docx(path),
         "pdf" => extract_pdf(path),
+        "xlsx" | "xls" | "xlsm" | "ods" => extract_spreadsheet(path),
         // I formati testuali noti vengono letti direttamente
         "txt" | "md" | "csv" | "json" | "xml" | "html" | "log" => {
             fs::read_to_string(path).ok()
@@ -26,6 +27,29 @@ pub fn extract_text(path: &Path) -> Option<String> {
 fn extract_pdf(path: &Path) -> Option<String> {
     // pdf-extract gestisce font, encoding e compressione interni al PDF
     pdf_extract::extract_text(path).ok()
+}
+
+/// Legge un foglio di calcolo trasformando ogni riga di celle in una riga di testo.
+fn extract_spreadsheet(path: &Path) -> Option<String> {
+    use calamine::{open_workbook_auto, Reader};
+
+    let mut workbook = open_workbook_auto(path).ok()?;
+    let mut output = String::new();
+
+    // Un file può contenere più fogli: li attraversiamo tutti
+    let sheet_names = workbook.sheet_names().to_owned();
+    for name in sheet_names {
+        if let Ok(range) = workbook.worksheet_range(&name) {
+            for row in range.rows() {
+                // Ogni cella diventa testo; le celle di una riga sono separate da tab
+                let cells: Vec<String> = row.iter().map(|c| c.to_string()).collect();
+                output.push_str(&cells.join("\t"));
+                output.push('\n');
+            }
+        }
+    }
+
+    Some(output)
 }
 
 fn extract_docx(path: &Path) -> Option<String> {

@@ -9,6 +9,7 @@ readme = "README.md"
 authors = ["Blazi2002"]
 
 [dependencies]
+calamine = "0.35.0"
 docx-rs = "0.4.20"
 pdf-extract = "0.10.0"
 walkdir = "2.5.0"
