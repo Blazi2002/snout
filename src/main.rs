@@ -1,50 +1,67 @@
 use std::env;
 use std::process;
 
-use walkdir::WalkDir;
-
 mod extract;
+mod indexer;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() < 3 {
-        eprintln!("Usage: snout <folder> <word>");
+    if args.len() < 2 {
+        print_usage();
         process::exit(1);
     }
-    let folder = &args[1];
-    let query = &args[2];
 
-    let mut total_matches = 0;
-
-    for entry in WalkDir::new(folder) {
-        let entry = match entry {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
-
-        if !entry.file_type().is_file() {
-            continue;
-        }
-
-        let path = entry.path();
-
-        // Delega l'estrazione del testo al modulo extract, che sceglie
-        // la strategia giusta in base al tipo di file (DOCX, testo, ecc.)
-        let content = match extract::extract_text(path) {
-            Some(text) => text,
-            None => continue,
-        };
-
-        for (i, line) in content.lines().enumerate() {
-            if line.contains(query.as_str()) {
-                println!("{}:{}: {}", path.display(), i + 1, line.trim());
-                total_matches += 1;
+    match args[1].as_str() {
+        "index" => {
+            if args.len() < 3 {
+                eprintln!("Usage: snout index <folder>");
+                process::exit(1);
+            }
+            let folder = &args[2];
+            match indexer::index_folder(folder) {
+                Ok(count) => println!("Indexed {} files into the index.", count),
+                Err(e) => {
+                    eprintln!("Indexing failed: {}", e);
+                    process::exit(1);
+                }
             }
         }
+        "search" => {
+            if args.len() < 3 {
+                eprintln!("Usage: snout search <query>");
+                process::exit(1);
+            }
+            let query = &args[2];
+            match indexer::search(query, 10) {
+                Ok(results) => {
+                    if results.is_empty() {
+                        println!("No results for '{}'.", query);
+                    } else {
+                        for path in results {
+                            println!("{}", path);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Search failed: {}", e);
+                    eprintln!("Did you run 'snout index <folder>' first?");
+                    process::exit(1);
+                }
+            }
+        }
+        other => {
+            eprintln!("Unknown command: '{}'", other);
+            print_usage();
+            process::exit(1);
+        }
     }
+}
 
-    if total_matches == 0 {
-        println!("No results for '{}'.", query);
-    }
+fn print_usage() {
+    eprintln!("Snout - local file search");
+    eprintln!();
+    eprintln!("Usage:");
+    eprintln!("  snout index <folder>    Build the search index from a folder");
+    eprintln!("  snout search <query>    Search the index");
 }
