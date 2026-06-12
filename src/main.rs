@@ -1,8 +1,9 @@
 use std::env;
-use std::fs;
 use std::process;
 
 use walkdir::WalkDir;
+
+mod extract;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -16,11 +17,9 @@ fn main() {
 
     let mut total_matches = 0;
 
-    // WalkDir scende ricorsivamente in ogni sottocartella a qualsiasi profondità
     for entry in WalkDir::new(folder) {
         let entry = match entry {
             Ok(e) => e,
-            // Una voce non accessibile (permessi, link rotti) non deve fermare la ricerca
             Err(_) => continue,
         };
 
@@ -30,10 +29,11 @@ fn main() {
 
         let path = entry.path();
 
-        // I file non leggibili come testo (binari, immagini, ecc.) vengono ignorati
-        let content = match fs::read_to_string(path) {
-            Ok(text) => text,
-            Err(_) => continue,
+        // Delega l'estrazione del testo al modulo extract, che sceglie
+        // la strategia giusta in base al tipo di file (DOCX, testo, ecc.)
+        let content = match extract::extract_text(path) {
+            Some(text) => text,
+            None => continue,
         };
 
         for (i, line) in content.lines().enumerate() {

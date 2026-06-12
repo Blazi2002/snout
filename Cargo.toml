@@ -9,4 +9,5 @@ readme = "README.md"
 authors = ["Blazi2002"]
 
 [dependencies]
+docx-rs = "0.4.20"
 walkdir = "2.5.0"
