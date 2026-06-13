@@ -20,7 +20,12 @@ fn main() {
             }
             let folder = &args[2];
             match indexer::index_folder(folder) {
-                Ok(count) => println!("Indexed {} files into the index.", count),
+                Ok((added, updated, unchanged)) => {
+                    println!(
+                        "Indexing complete: {} added, {} updated, {} unchanged.",
+                        added, updated, unchanged
+                    );
+                }
                 Err(e) => {
                     eprintln!("Indexing failed: {}", e);
                     process::exit(1);
@@ -62,6 +67,6 @@ fn print_usage() {
     eprintln!("Snout - local file search");
     eprintln!();
     eprintln!("Usage:");
-    eprintln!("  snout index <folder>    Build the search index from a folder");
+    eprintln!("  snout index <folder>    Build or update the search index");
     eprintln!("  snout search <query>    Search the index");
 }
