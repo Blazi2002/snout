@@ -6,6 +6,7 @@ mod indexer;
 mod embed;
 mod chunker;
 mod vectors;
+mod hybrid;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -95,6 +96,25 @@ fn main() {
                 Err(e) => eprintln!("Model load failed: {}", e),
             }
         }
+        "find" => {
+            if args.len() < 3 {
+                eprintln!("Usage: snout find <query>");
+                process::exit(1);
+            }
+            let query = &args[2];
+            match hybrid::hybrid_search(query, 10) {
+                Ok(hits) => {
+                    if hits.is_empty() {
+                        println!("No results for '{}'.", query);
+                    } else {
+                        for hit in hits {
+                            println!("[{:.4}] {}", hit.score, hit.path);
+                        }
+                    }
+                }
+                Err(e) => eprintln!("Find failed: {}", e),
+            }
+        }
         "chunk-test" => {
             if args.len() < 3 {
                 eprintln!("Usage: snout chunk-test <text>");
@@ -120,6 +140,7 @@ fn print_usage() {
     eprintln!();
     eprintln!("Usage:");
     eprintln!("  snout index <folder> [--semantic]   Build or update the index");
-    eprintln!("  snout search <query>                Search the index (full-text)");
-    eprintln!("  snout semantic <query>              Search by meaning (semantic)");
+    eprintln!("  snout find <query>                  Hybrid search (full-text + semantic)");
+    eprintln!("  snout search <query>                Full-text search only");
+    eprintln!("  snout semantic <query>              Semantic search only");
 }
