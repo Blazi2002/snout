@@ -5,6 +5,7 @@ mod extract;
 mod indexer;
 mod embed;
 mod chunker;
+mod vectors;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -17,16 +18,25 @@ fn main() {
     match args[1].as_str() {
         "index" => {
             if args.len() < 3 {
-                eprintln!("Usage: snout index <folder>");
+                eprintln!("Usage: snout index <folder> [--semantic]");
                 process::exit(1);
             }
             let folder = &args[2];
-            match indexer::index_folder(folder) {
+            let semantic = args.iter().any(|a| a == "--semantic");
+
+            if semantic {
+                println!("Indexing with semantic embeddings (this may take a while)...");
+            }
+
+            match indexer::index_folder(folder, semantic) {
                 Ok((added, updated, unchanged)) => {
                     println!(
                         "Indexing complete: {} added, {} updated, {} unchanged.",
                         added, updated, unchanged
                     );
+                    if semantic {
+                        println!("Semantic embeddings generated.");
+                    }
                 }
                 Err(e) => {
                     eprintln!("Indexing failed: {}", e);
@@ -57,21 +67,30 @@ fn main() {
                 }
             }
         }
-        "embed-test" => {
-            let text = if args.len() >= 3 {
-                args[2].clone()
-            } else {
-                "il gatto dorme".to_string()
-            };
+        "semantic" => {
+            if args.len() < 3 {
+                eprintln!("Usage: snout semantic <query>");
+                process::exit(1);
+            }
+            let query = args[2].clone();
             match embed::load_model() {
-                Ok(mut model) => match embed::embed_texts(&mut model, vec![text.clone()]) {
-                    Ok(vectors) => {
-                        let v = &vectors[0];
-                        println!("Frase: \"{}\"", text);
-                        println!("Vettore di {} dimensioni.", v.len());
-                        println!("Primi 5 valori: {:?}", &v[..5.min(v.len())]);
+                Ok(mut model) => match embed::embed_texts(&mut model, vec![query.clone()]) {
+                    Ok(mut qvecs) => {
+                        let qvec = qvecs.remove(0);
+                        match vectors::semantic_search(&qvec, 5) {
+                            Ok(hits) => {
+                                if hits.is_empty() {
+                                    println!("No semantic results. Did you index with --semantic?");
+                                } else {
+                                    for hit in hits {
+                                        println!("[{:.3}] {}", hit.score, hit.path);
+                                    }
+                                }
+                            }
+                            Err(e) => eprintln!("Semantic search failed: {}", e),
+                        }
                     }
-                    Err(e) => eprintln!("Embedding failed: {}", e),
+                    Err(e) => eprintln!("Query embedding failed: {}", e),
                 },
                 Err(e) => eprintln!("Model load failed: {}", e),
             }
@@ -100,6 +119,7 @@ fn print_usage() {
     eprintln!("Snout - local file search");
     eprintln!();
     eprintln!("Usage:");
-    eprintln!("  snout index <folder>    Build or update the search index");
-    eprintln!("  snout search <query>    Search the index");
+    eprintln!("  snout index <folder> [--semantic]   Build or update the index");
+    eprintln!("  snout search <query>                Search the index (full-text)");
+    eprintln!("  snout semantic <query>              Search by meaning (semantic)");
 }

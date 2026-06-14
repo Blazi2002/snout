@@ -9,6 +9,9 @@ use tantivy::{doc, Index, TantivyDocument, Term};
 use walkdir::WalkDir;
 
 use crate::extract;
+use crate::chunker;
+use crate::embed;
+use crate::vectors::{self, ChunkRecord};
 
 const INDEX_DIR: &str = ".snout_index";
 
@@ -66,11 +69,21 @@ fn existing_hashes(index: &Index, fields: &Fields) -> tantivy::Result<HashMap<St
     Ok(map)
 }
 
-pub fn index_folder(folder: &str) -> tantivy::Result<(usize, usize, usize)> {
+/// Indicizza la cartella. Se `semantic` e' true, genera e salva anche gli embedding
+/// dei chunk di ogni file (ricostruendo da zero lo store vettoriale).
+pub fn index_folder(folder: &str, semantic: bool) -> anyhow::Result<(usize, usize, usize)> {
     let (index, fields) = open_or_create()?;
     let already = existing_hashes(&index, &fields)?;
 
     let mut writer = index.writer(50_000_000)?;
+
+    // Per la parte semantica: azzeriamo lo store dei vettori e carichiamo il modello una volta.
+    let mut model = if semantic {
+        vectors::reset()?;
+        Some(embed::load_model()?)
+    } else {
+        None
+    };
 
     let mut added = 0;
     let mut updated = 0;
@@ -89,8 +102,6 @@ pub fn index_folder(folder: &str) -> tantivy::Result<(usize, usize, usize)> {
         let path = entry.path();
         let path_str = path.display().to_string();
 
-        // Estraiamo testo e hash PRIMA di qualsiasi modifica all'indice:
-        // se uno dei due fallisce, saltiamo il file senza lasciare stati incompleti.
         let current_hash = match file_hash(path) {
             Some(h) => h,
             None => continue,
@@ -100,28 +111,47 @@ pub fn index_folder(folder: &str) -> tantivy::Result<(usize, usize, usize)> {
             None => continue,
         };
 
-        // Il file e' leggibile: da qui in poi lo consideriamo "visto".
         seen_paths.push(path_str.clone());
 
-        if let Some(old_hash) = already.get(&path_str) {
-            if old_hash == &current_hash {
-                unchanged += 1;
-                continue;
-            }
-            writer.delete_term(Term::from_field_text(fields.path, &path_str));
-            updated += 1;
+        let is_unchanged = already.get(&path_str) == Some(&current_hash);
+
+        // La parte full-text usa l'indicizzazione incrementale.
+        if is_unchanged {
+            unchanged += 1;
         } else {
-            added += 1;
+            if already.contains_key(&path_str) {
+                writer.delete_term(Term::from_field_text(fields.path, &path_str));
+                updated += 1;
+            } else {
+                added += 1;
+            }
+
+            writer.add_document(doc!(
+                fields.path => path_str.clone(),
+                fields.body => content.clone(),
+                fields.hash => current_hash,
+            ))?;
         }
 
-        writer.add_document(doc!(
-            fields.path => path_str,
-            fields.body => content,
-            fields.hash => current_hash,
-        ))?;
+        // La parte semantica rigenera i vettori per ogni file leggibile (store ricostruito).
+        if let Some(ref mut m) = model {
+            let chunks = chunker::chunk_text(&content);
+            if !chunks.is_empty() {
+                let vecs = embed::embed_texts(m, chunks.clone())?;
+                let records: Vec<ChunkRecord> = chunks
+                    .into_iter()
+                    .zip(vecs.into_iter())
+                    .map(|(text, vector)| ChunkRecord {
+                        path: path_str.clone(),
+                        text,
+                        vector,
+                    })
+                    .collect();
+                vectors::append(&records)?;
+            }
+        }
     }
 
-    // Rimuoviamo i documenti i cui file non esistono piu' (o non sono piu' leggibili).
     for old_path in already.keys() {
         if !seen_paths.contains(old_path) {
             writer.delete_term(Term::from_field_text(fields.path, old_path));
