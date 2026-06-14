@@ -1,4 +1,5 @@
 use serde::Serialize;
+use tauri::{AppHandle, Emitter};
 
 #[derive(Serialize)]
 struct SearchResult {
@@ -12,6 +13,12 @@ struct IndexSummary {
     added: usize,
     updated: usize,
     unchanged: usize,
+}
+
+#[derive(Serialize, Clone)]
+struct IndexProgress {
+    processed: usize,
+    total: usize,
 }
 
 #[tauri::command]
@@ -32,12 +39,23 @@ fn search_files(query: String) -> Result<Vec<SearchResult>, String> {
     }
 }
 
+/// Comando asincrono: l'indicizzazione (lavoro pesante e bloccante) viene eseguita
+/// su un thread separato, cosi' il thread dell'interfaccia resta libero e gli eventi
+/// di progresso possono essere consegnati al front-end in tempo reale.
 #[tauri::command]
-fn index_folder(path: String) -> Result<IndexSummary, String> {
-    match snout::indexer::index_folder(&path, true) {
-        Ok((added, updated, unchanged)) => Ok(IndexSummary { added, updated, unchanged }),
-        Err(e) => Err(format!("Indexing failed: {}", e)),
-    }
+async fn index_folder(app: AppHandle, path: String) -> Result<IndexSummary, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let progress = |processed: usize, total: usize| {
+            let _ = app.emit("index-progress", IndexProgress { processed, total });
+        };
+
+        match snout::indexer::index_folder(&path, true, progress) {
+            Ok((added, updated, unchanged)) => Ok(IndexSummary { added, updated, unchanged }),
+            Err(e) => Err(format!("Indexing failed: {}", e)),
+        }
+    })
+    .await
+    .map_err(|e| format!("Task failed: {}", e))?
 }
 
 #[tauri::command]

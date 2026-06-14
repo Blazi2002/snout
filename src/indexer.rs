@@ -71,7 +71,7 @@ fn existing_hashes(index: &Index, fields: &Fields) -> tantivy::Result<HashMap<St
 
 /// Indicizza la cartella. Se `semantic` e' true, genera e salva anche gli embedding
 /// dei chunk di ogni file (ricostruendo da zero lo store vettoriale).
-pub fn index_folder(folder: &str, semantic: bool) -> anyhow::Result<(usize, usize, usize)> {
+pub fn index_folder<F: Fn(usize, usize)>(folder: &str, semantic: bool, progress: F) -> anyhow::Result<(usize, usize, usize)> {
     let (index, fields) = open_or_create()?;
     let already = existing_hashes(&index, &fields)?;
 
@@ -84,6 +84,14 @@ pub fn index_folder(folder: &str, semantic: bool) -> anyhow::Result<(usize, usiz
     } else {
         None
     };
+
+    let total: usize = WalkDir::new(folder)
+        .into_iter()
+        .filter_entry(|e| !should_skip(e))
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .count();
+    let mut processed = 0;
 
     let mut added = 0;
     let mut updated = 0;
@@ -112,6 +120,8 @@ pub fn index_folder(folder: &str, semantic: bool) -> anyhow::Result<(usize, usiz
         };
 
         seen_paths.push(path_str.clone());
+        processed += 1;
+        progress(processed, total);
 
         let is_unchanged = already.get(&path_str) == Some(&current_hash);
 

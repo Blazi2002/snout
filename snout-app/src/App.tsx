@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 
 interface SearchResult {
@@ -15,6 +16,11 @@ interface IndexSummary {
   unchanged: number;
 }
 
+interface IndexProgress {
+  processed: number;
+  total: number;
+}
+
 function App() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -23,6 +29,17 @@ function App() {
   const [searched, setSearched] = useState(false);
   const [indexing, setIndexing] = useState(false);
   const [status, setStatus] = useState("");
+  const [progress, setProgress] = useState<IndexProgress | null>(null);
+
+  // Ascolta gli eventi di progresso emessi dal backend durante l'indicizzazione.
+  useEffect(() => {
+    const unlisten = listen<IndexProgress>("index-progress", (event) => {
+      setProgress(event.payload);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
 
   async function handleChooseAndIndex() {
     try {
@@ -30,16 +47,19 @@ function App() {
       if (!selected || typeof selected !== "string") return;
 
       setIndexing(true);
-      setStatus(`Indexing ${selected}...`);
+      setProgress(null);
+      setStatus("");
       setError("");
 
       const summary = await invoke<IndexSummary>("index_folder", { path: selected });
       setStatus(
         `Done: ${summary.added} added, ${summary.updated} updated, ${summary.unchanged} unchanged.`
       );
+      setProgress(null);
     } catch (e) {
       setError(String(e));
       setStatus("");
+      setProgress(null);
     } finally {
       setIndexing(false);
     }
@@ -82,6 +102,11 @@ function App() {
     return { name, dir };
   }
 
+  const progressPercent =
+    progress && progress.total > 0
+      ? Math.round((progress.processed / progress.total) * 100)
+      : 0;
+
   return (
     <div className="app">
       <header className="header">
@@ -98,6 +123,17 @@ function App() {
         </button>
         {status && <span className="status">{status}</span>}
       </div>
+
+      {indexing && progress && (
+        <div className="progress-wrap">
+          <div className="progress-bar">
+            <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
+          </div>
+          <span className="progress-text">
+            {progress.processed} / {progress.total} files ({progressPercent}%)
+          </span>
+        </div>
+      )}
 
       <div className="search-bar">
         <span className="search-icon">⌕</span>

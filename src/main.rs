@@ -25,7 +25,7 @@ fn main() {
                 println!("Indexing with semantic embeddings (this may take a while)...");
             }
 
-            match indexer::index_folder(folder, semantic) {
+            match indexer::index_folder(folder, semantic, |_, _| {}) {
                 Ok((added, updated, unchanged)) => {
                     println!(
                         "Indexing complete: {} added, {} updated, {} unchanged.",
