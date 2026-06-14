@@ -3,6 +3,8 @@ use std::process;
 
 mod extract;
 mod indexer;
+mod embed;
+mod chunker;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -53,6 +55,37 @@ fn main() {
                     eprintln!("Did you run 'snout index <folder>' first?");
                     process::exit(1);
                 }
+            }
+        }
+        "embed-test" => {
+            let text = if args.len() >= 3 {
+                args[2].clone()
+            } else {
+                "il gatto dorme".to_string()
+            };
+            match embed::load_model() {
+                Ok(mut model) => match embed::embed_texts(&mut model, vec![text.clone()]) {
+                    Ok(vectors) => {
+                        let v = &vectors[0];
+                        println!("Frase: \"{}\"", text);
+                        println!("Vettore di {} dimensioni.", v.len());
+                        println!("Primi 5 valori: {:?}", &v[..5.min(v.len())]);
+                    }
+                    Err(e) => eprintln!("Embedding failed: {}", e),
+                },
+                Err(e) => eprintln!("Model load failed: {}", e),
+            }
+        }
+        "chunk-test" => {
+            if args.len() < 3 {
+                eprintln!("Usage: snout chunk-test <text>");
+                process::exit(1);
+            }
+            let chunks = chunker::chunk_text(&args[2]);
+            println!("Il testo e' stato diviso in {} chunk:\n", chunks.len());
+            for (i, c) in chunks.iter().enumerate() {
+                println!("--- Chunk {} ({} caratteri) ---", i + 1, c.chars().count());
+                println!("{}\n", c);
             }
         }
         other => {
