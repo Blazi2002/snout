@@ -1,6 +1,6 @@
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
-use std::path::Path;
+
 
 use serde::{Deserialize, Serialize};
 
@@ -12,11 +12,11 @@ pub struct ChunkRecord {
     pub vector: Vec<f32>,
 }
 
-const STORE_PATH: &str = ".snout_index/embeddings.jsonl";
+use crate::paths;
 
 pub fn reset() -> std::io::Result<()> {
-    if Path::new(STORE_PATH).exists() {
-        std::fs::remove_file(STORE_PATH)?;
+    if paths::embeddings_path().exists() {
+        std::fs::remove_file(paths::embeddings_path())?;
     }
     Ok(())
 }
@@ -25,7 +25,7 @@ pub fn append(records: &[ChunkRecord]) -> std::io::Result<()> {
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(STORE_PATH)?;
+        .open(paths::embeddings_path())?;
 
     for record in records {
         let line = serde_json::to_string(record)?;
@@ -36,11 +36,11 @@ pub fn append(records: &[ChunkRecord]) -> std::io::Result<()> {
 
 pub fn load_all() -> std::io::Result<Vec<ChunkRecord>> {
     let mut records = Vec::new();
-    if !Path::new(STORE_PATH).exists() {
+    if !paths::embeddings_path().exists() {
         return Ok(records);
     }
 
-    let file = File::open(STORE_PATH)?;
+    let file = File::open(paths::embeddings_path())?;
     let reader = BufReader::new(file);
     for line in reader.lines() {
         let line = line?;

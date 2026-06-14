@@ -1,11 +1,17 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import "./App.css";
 
-// Struttura di un risultato, come arriva dal motore Rust.
 interface SearchResult {
   path: string;
   score: number;
+}
+
+interface IndexSummary {
+  added: number;
+  updated: number;
+  unchanged: number;
 }
 
 function App() {
@@ -14,6 +20,30 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
+  const [indexing, setIndexing] = useState(false);
+  const [status, setStatus] = useState("");
+
+  async function handleChooseAndIndex() {
+    try {
+      // Apre la finestra nativa per scegliere una cartella.
+      const selected = await open({ directory: true, multiple: false });
+      if (!selected || typeof selected !== "string") return;
+
+      setIndexing(true);
+      setStatus(`Indexing ${selected}...`);
+      setError("");
+
+      const summary = await invoke<IndexSummary>("index_folder", { path: selected });
+      setStatus(
+        `Done: ${summary.added} added, ${summary.updated} updated, ${summary.unchanged} unchanged.`
+      );
+    } catch (e) {
+      setError(String(e));
+      setStatus("");
+    } finally {
+      setIndexing(false);
+    }
+  }
 
   async function handleSearch() {
     if (query.trim() === "") {
@@ -27,7 +57,6 @@ function App() {
     setSearched(true);
 
     try {
-      // Chiamiamo il command Rust 'search_files' passandogli la query.
       const hits = await invoke<SearchResult[]>("search_files", { query });
       setResults(hits);
     } catch (e) {
@@ -47,6 +76,13 @@ function App() {
         </div>
         <p className="tagline">Search your files by meaning, locally.</p>
       </header>
+
+      <div className="toolbar">
+        <button className="index-button" onClick={handleChooseAndIndex} disabled={indexing}>
+          {indexing ? "Indexing..." : "📁 Choose folder & index"}
+        </button>
+        {status && <span className="status">{status}</span>}
+      </div>
 
       <div className="search-bar">
         <span className="search-icon">⌕</span>
@@ -77,7 +113,7 @@ function App() {
 
         {!error && !loading && !searched && (
           <div className="empty-state">
-            <p>Type something and press Enter to search your files.</p>
+            <p>Choose a folder to index, then search your files.</p>
           </div>
         )}
 

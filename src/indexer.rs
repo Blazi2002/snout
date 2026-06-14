@@ -13,7 +13,7 @@ use crate::chunker;
 use crate::embed;
 use crate::vectors::{self, ChunkRecord};
 
-const INDEX_DIR: &str = ".snout_index";
+use crate::paths;
 
 struct Fields {
     path: Field,
@@ -31,13 +31,13 @@ fn build_schema() -> (Schema, Fields) {
 }
 
 fn open_or_create() -> tantivy::Result<(Index, Fields)> {
-    let index_path = Path::new(INDEX_DIR);
+    let index_path = paths::index_dir();
     let (schema, fields) = build_schema();
 
     let index = if index_path.exists() {
         Index::open_in_dir(index_path)?
     } else {
-        fs::create_dir_all(index_path).ok();
+        fs::create_dir_all(&index_path).ok();
         Index::create_in_dir(index_path, schema)?
     };
 
@@ -90,7 +90,7 @@ pub fn index_folder(folder: &str, semantic: bool) -> anyhow::Result<(usize, usiz
     let mut unchanged = 0;
     let mut seen_paths = Vec::new();
 
-    for entry in WalkDir::new(folder) {
+    for entry in WalkDir::new(folder).into_iter().filter_entry(|e| !should_skip(e)) {
         let entry = match entry {
             Ok(e) => e,
             Err(_) => continue,
@@ -164,7 +164,7 @@ pub fn index_folder(folder: &str, semantic: bool) -> anyhow::Result<(usize, usiz
 }
 
 pub fn search(query_text: &str, limit: usize) -> tantivy::Result<Vec<String>> {
-    let index_path = Path::new(INDEX_DIR);
+    let index_path = paths::index_dir();
     let index = Index::open_in_dir(index_path)?;
 
     let schema = index.schema();
@@ -190,4 +190,27 @@ pub fn search(query_text: &str, limit: usize) -> tantivy::Result<Vec<String>> {
     }
 
     Ok(results)
+}
+
+/// Decide se saltare una voce durante la scansione. Vengono escluse le cartelle
+/// nascoste (che iniziano con '.') e alcune cartelle tipiche di build/dipendenze,
+/// che non contengono documenti dell'utente e gonfierebbero inutilmente l'indice.
+fn should_skip(entry: &walkdir::DirEntry) -> bool {
+    let name = entry.file_name().to_string_lossy();
+
+    // Saltiamo le cartelle nascoste (es. .git, .cache), ma non i file nascosti
+    // e non la cartella radice scelta dall'utente (profondita' 0).
+    if entry.depth() > 0 && entry.file_type().is_dir() && name.starts_with('.') {
+        return true;
+    }
+
+    // Cartelle tipiche di build/dipendenze, prive di documenti utili.
+    if entry.file_type().is_dir() {
+        matches!(
+            name.as_ref(),
+            "target" | "node_modules" | "dist" | "build" | "__pycache__" | ".git"
+        )
+    } else {
+        false
+    }
 }
