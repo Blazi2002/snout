@@ -4,6 +4,7 @@ use serde::Serialize;
 struct SearchResult {
     path: String,
     score: f32,
+    preview: String,
 }
 
 #[derive(Serialize)]
@@ -23,7 +24,7 @@ fn search_files(query: String) -> Result<Vec<SearchResult>, String> {
         Ok(hits) => {
             let results = hits
                 .into_iter()
-                .map(|h| SearchResult { path: h.path, score: h.score })
+                .map(|h| SearchResult { path: h.path, score: h.score, preview: h.preview })
                 .collect();
             Ok(results)
         }
@@ -39,10 +40,8 @@ fn index_folder(path: String) -> Result<IndexSummary, String> {
     }
 }
 
-/// Apre un file nell'applicazione predefinita del sistema operativo.
 #[tauri::command]
 fn open_file(path: String) -> Result<(), String> {
-    // Usa il comando di sistema appropriato per aprire il file con l'app di default.
     #[cfg(target_os = "macos")]
     let result = std::process::Command::new("open").arg(&path).spawn();
 

@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-
 import "./App.css";
 
 interface SearchResult {
   path: string;
   score: number;
+  preview: string;
 }
 
 interface IndexSummary {
@@ -75,7 +75,6 @@ function App() {
     }
   }
 
-  // Estrae nome file e cartella dal percorso completo, per una resa piu' leggibile.
   function splitPath(full: string): { name: string; dir: string } {
     const parts = full.split("/");
     const name = parts[parts.length - 1] || full;
@@ -142,6 +141,7 @@ function App() {
                 <span className="result-score">{(r.score * 1000).toFixed(1)}</span>
               </div>
               <p className="result-dir">{dir}</p>
+              {r.preview && <p className="result-preview">{r.preview}</p>}
             </div>
           );
         })}
