@@ -1,3 +1,8 @@
 /target
 .snout_index/
 .fastembed_cache/
+
+# Tauri app build artifacts
+snout-app/node_modules/
+snout-app/src-tauri/target/
+snout-app/dist/
