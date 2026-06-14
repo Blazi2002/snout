@@ -215,3 +215,16 @@ body {
   padding: 14px 18px;
   font-size: 14px;
 }
+
+.result-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.result-dir {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  word-break: break-all;
+}

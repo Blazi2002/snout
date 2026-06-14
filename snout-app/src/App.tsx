@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+
 import "./App.css";
 
 interface SearchResult {
@@ -25,7 +26,6 @@ function App() {
 
   async function handleChooseAndIndex() {
     try {
-      // Apre la finestra nativa per scegliere una cartella.
       const selected = await open({ directory: true, multiple: false });
       if (!selected || typeof selected !== "string") return;
 
@@ -65,6 +65,22 @@ function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleOpenFile(path: string) {
+    try {
+      await invoke("open_file", { path });
+    } catch (e) {
+      setError(`Could not open file: ${e}`);
+    }
+  }
+
+  // Estrae nome file e cartella dal percorso completo, per una resa piu' leggibile.
+  function splitPath(full: string): { name: string; dir: string } {
+    const parts = full.split("/");
+    const name = parts[parts.length - 1] || full;
+    const dir = parts.slice(0, -1).join("/");
+    return { name, dir };
   }
 
   return (
@@ -117,14 +133,18 @@ function App() {
           </div>
         )}
 
-        {!error && !loading && results.map((r, i) => (
-          <div className="result-card" key={i}>
-            <div className="result-header">
-              <span className="result-path">{r.path}</span>
-              <span className="result-score">{(r.score * 1000).toFixed(1)}</span>
+        {!error && !loading && results.map((r, i) => {
+          const { name, dir } = splitPath(r.path);
+          return (
+            <div className="result-card" key={i} onClick={() => handleOpenFile(r.path)}>
+              <div className="result-header">
+                <span className="result-name">{name}</span>
+                <span className="result-score">{(r.score * 1000).toFixed(1)}</span>
+              </div>
+              <p className="result-dir">{dir}</p>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
