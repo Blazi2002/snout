@@ -6,3 +6,5 @@
 snout-app/node_modules/
 snout-app/src-tauri/target/
 snout-app/dist/
+prova_app/
+snout-app/src-tauri/prova_app/

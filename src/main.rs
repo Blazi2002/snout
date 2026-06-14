@@ -1,12 +1,8 @@
 use std::env;
 use std::process;
 
-mod extract;
-mod indexer;
-mod embed;
-mod chunker;
-mod vectors;
-mod hybrid;
+// Importiamo i moduli dalla libreria del crate (definita in lib.rs).
+use snout::{chunker, embed, hybrid, indexer, vectors};
 
 fn main() {
     let args: Vec<String> = env::args().collect();

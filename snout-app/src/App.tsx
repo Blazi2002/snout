@@ -1,25 +1,41 @@
 import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
-// Risultati finti di esempio, solo per costruire e vedere il design.
-// Verranno sostituiti dai risultati reali del motore di ricerca.
-const MOCK_RESULTS = [
-  { path: "Documenti/ricette/carbonara.docx", snippet: "La ricetta della carbonara prevede uova, guanciale, pecorino e pepe nero...", score: 0.94 },
-  { path: "Documenti/finanza/investimenti_2025.pdf", snippet: "Per investire in borsa è importante diversificare il portafoglio...", score: 0.81 },
-  { path: "Documenti/casa/animali_domestici.txt", snippet: "Il gatto e il cane sono animali domestici molto diffusi nelle case italiane...", score: 0.76 },
-];
+// Struttura di un risultato, come arriva dal motore Rust.
+interface SearchResult {
+  path: string;
+  score: number;
+}
 
 function App() {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<typeof MOCK_RESULTS>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [searched, setSearched] = useState(false);
 
-  function handleSearch() {
-    // Per ora mostriamo i risultati finti. Qui collegheremo il motore reale.
+  async function handleSearch() {
     if (query.trim() === "") {
       setResults([]);
+      setSearched(false);
       return;
     }
-    setResults(MOCK_RESULTS);
+
+    setLoading(true);
+    setError("");
+    setSearched(true);
+
+    try {
+      // Chiamiamo il command Rust 'search_files' passandogli la query.
+      const hits = await invoke<SearchResult[]>("search_files", { query });
+      setResults(hits);
+    } catch (e) {
+      setError(String(e));
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -43,27 +59,36 @@ function App() {
           onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
           autoFocus
         />
-        <button className="search-button" onClick={handleSearch}>
-          Search
+        <button className="search-button" onClick={handleSearch} disabled={loading}>
+          {loading ? "..." : "Search"}
         </button>
       </div>
 
       <div className="results">
-        {results.length === 0 ? (
+        {error && <div className="error-state">{error}</div>}
+
+        {!error && loading && (
+          <div className="empty-state"><p>Searching...</p></div>
+        )}
+
+        {!error && !loading && searched && results.length === 0 && (
+          <div className="empty-state"><p>No results found.</p></div>
+        )}
+
+        {!error && !loading && !searched && (
           <div className="empty-state">
             <p>Type something and press Enter to search your files.</p>
           </div>
-        ) : (
-          results.map((r, i) => (
-            <div className="result-card" key={i}>
-              <div className="result-header">
-                <span className="result-path">{r.path}</span>
-                <span className="result-score">{Math.round(r.score * 100)}%</span>
-              </div>
-              <p className="result-snippet">{r.snippet}</p>
-            </div>
-          ))
         )}
+
+        {!error && !loading && results.map((r, i) => (
+          <div className="result-card" key={i}>
+            <div className="result-header">
+              <span className="result-path">{r.path}</span>
+              <span className="result-score">{(r.score * 1000).toFixed(1)}</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

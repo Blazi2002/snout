@@ -1,3 +1,7 @@
+[workspace]
+members = [".", "snout-app/src-tauri"]
+resolver = "2"
+
 [package]
 name = "snout"
 version = "0.1.0"
