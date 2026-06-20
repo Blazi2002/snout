@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "snout-app",
+  "productName": "Snout",
   "version": "0.1.0",
   "identifier": "com.blazi2002.snout",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "snout-app",
+        "title": "Snout",
         "width": 800,
         "height": 600
       }
