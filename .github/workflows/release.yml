@@ -1,6 +1,5 @@
 name: Release
 
-# Scatta quando viene pushato un tag che inizia con "v" (es. v0.1.0).
 on:
   push:
     tags:
@@ -14,23 +13,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-latest"   # Mac (Apple Silicon + Intel)
-            args: "--target universal-apple-darwin"
-          - platform: "ubuntu-22.04"   # Linux
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin"
+          - platform: "windows-latest"
             args: ""
-          - platform: "windows-latest" # Windows
-            args: ""
+          # Linux temporaneamente disabilitato: il linking di ONNX Runtime
+          # richiede una configurazione dedicata, da affrontare separatamente.
 
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
-
-      # Dipendenze di sistema richieste da Tauri su Linux.
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -40,10 +32,8 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          # Su macOS aggiungiamo i target per il binario universale.
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
-      # Cache delle dipendenze Rust, per velocizzare i build successivi.
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
@@ -61,7 +51,7 @@ jobs:
           projectPath: ./snout-app
           tagName: ${{ github.ref_name }}
           releaseName: "Snout ${{ github.ref_name }}"
-          releaseBody: "See the assets below to download Snout for your platform."
+          releaseBody: "Download Snout for your platform from the assets below."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
